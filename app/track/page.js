@@ -1,34 +1,34 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { rp } from '../../lib/supabase';
-export default function Track() {
-  const [code, setCode] = useState(''); const [phone, setPhone] = useState(''); const [d, setD] = useState(null); const [err, setErr] = useState('');
-  const look = async (c, p) => {
-    setErr(''); setD(null);
-    const r = await fetch(`/api/track?code=${encodeURIComponent(c)}&phone=${encodeURIComponent(p)}`);
-    const j = await r.json(); if (!r.ok) return setErr(j.error); setD(j);
-  };
+import { useRouter } from 'next/navigation';
+import { supabase, rp } from '../../lib/supabase';
+export default function Orders() {
+  const router = useRouter();
+  const [orders, setOrders] = useState(null); const [ev, setEv] = useState([]); const [pay, setPay] = useState([]); const [open, setOpen] = useState('');
   useEffect(() => {
-    const q = new URLSearchParams(location.search);
-    if (q.get('code')) { setCode(q.get('code')); setPhone(q.get('phone') || ''); look(q.get('code'), q.get('phone') || ''); }
+    setOpen(new URLSearchParams(location.search).get('code') || '');
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return router.replace('/login?next=/track');
+      const a = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+      const b = await supabase.from('tracking_events').select('*').order('created_at', { ascending: false });
+      const c = await supabase.from('payment_methods').select('*');
+      setOrders(a.data || []); setEv(b.data || []); setPay(c.data || []);
+    });
   }, []);
-  const o = d?.order;
+  if (!orders) return <div className="wrap"><p className="empty-txt">Memuat pesanan...</p></div>;
   return <div className="wrap tr">
-    <h2 className="ttl"><span>CEK PESANAN</span></h2>
-    <form onSubmit={e => { e.preventDefault(); look(code, phone); }}>
-      <label>Kode pesanan<input required value={code} onChange={e => setCode(e.target.value.toUpperCase())} /></label>
-      <label>No. HP saat order<input required value={phone} onChange={e => setPhone(e.target.value)} /></label>
-      <button className="btn">Lihat status</button>
-    </form>
-    {err && <p className="err">{err}</p>}
-    {o && <div className="res">
-      <h3>{o.code} · {o.status}</h3>
-      {o.status === 'Menunggu Pembayaran' && d.payment && <p className="note">Transfer {rp(o.total)} ke {d.payment.name} {d.payment.account_number} a.n. {d.payment.account_name}. {d.payment.note}</p>}
-      <p>{o.shipping_method}{o.resi ? ` · Resi ${o.resi}` : ''}</p>
-      {o.items.map((i, k) => <p key={k}>{i.name} ({i.size}) × {i.qty}</p>)}
-      <p><b>Total {rp(o.total)}</b></p>
-      <h3>Perjalanan paket</h3>
-      {d.events.length ? <ol className="tl">{d.events.map(e => <li key={e.id}><small>{new Date(e.created_at).toLocaleString('id-ID')}</small><p>{e.note}</p></li>)}</ol> : <p>Belum ada update pengiriman.</p>}
-    </div>}
+    <h2 className="ttl"><span>PESANAN SAYA</span></h2>
+    {!orders.length && <p className="empty-txt">Belum ada pesanan.</p>}
+    {orders.map(o => {
+      const p = pay.find(x => x.name === o.payment_method); const events = ev.filter(e => e.order_id === o.id);
+      return <details className="res" key={o.id} open={o.code === open}>
+        <summary><b>{o.code}</b> · {o.status} · {rp(o.total)}<br /><small>{new Date(o.created_at).toLocaleDateString('id-ID')}</small></summary>
+        {o.status === 'Menunggu Pembayaran' && p && <p className="note">Transfer {rp(o.total)} ke {p.name} {p.account_number} a.n. {p.account_name}. {p.note}</p>}
+        <p>{o.shipping_method}{o.resi ? ` · Resi ${o.resi}` : ''}</p>
+        {o.items.map((i, k) => <p key={k}>{i.name} ({i.size}) × {i.qty}</p>)}
+        <h3>Perjalanan paket</h3>
+        {events.length ? <ol className="tl">{events.map(e => <li key={e.id}><small>{new Date(e.created_at).toLocaleString('id-ID')}</small><p>{e.note}</p></li>)}</ol> : <p>Belum ada update pengiriman.</p>}
+      </details>;
+    })}
   </div>;
 }

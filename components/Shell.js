@@ -2,20 +2,28 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 export default function Shell({ children }) {
   const p = usePathname();
   const [n, setN] = useState(0);
+  const [u, setU] = useState(null);
   useEffect(() => {
     const f = () => { try { setN(JSON.parse(localStorage.getItem('cart') || '[]').reduce((a, i) => a + i.qty, 0)); } catch {} };
     f(); window.addEventListener('cart', f);
     return () => window.removeEventListener('cart', f);
   }, []);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setU(data.session?.user || null));
+    const { data: l } = supabase.auth.onAuthStateChange((_e, s) => setU(s?.user || null));
+    return () => l.subscription.unsubscribe();
+  }, []);
+  const out = async e => { e.preventDefault(); await supabase.auth.signOut(); localStorage.setItem('cart', '[]'); window.dispatchEvent(new Event('cart')); location.href = '/'; };
   if (p.startsWith('/admin')) return children;
   return <>
     <div className="bar">LEBIH HEMAT BELANJA DI WEBSITE RESMI SIXTYNINE PROJECT</div>
     <header className="hd">
       <Link href="/" className="logo">SIXTY<br />NINE</Link>
-      <nav><Link href="/#shop">SHOP</Link><Link href="/track">CEK PESANAN</Link><Link href="/checkout">KERANJANG ({n})</Link></nav>
+      <nav><Link href="/#shop">SHOP</Link><Link href="/track">PESANAN SAYA</Link><Link href="/checkout">KERANJANG ({n})</Link>{u ? <a href="#" onClick={out}>KELUAR</a> : <Link href="/login">MASUK</Link>}</nav>
     </header>
     <main>{children}</main>
     <footer className="ft">

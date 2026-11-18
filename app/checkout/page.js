@@ -8,6 +8,7 @@ export default function Checkout() {
   const [f, setF] = useState({ buyer_name: '', buyer_phone: '', buyer_email: '', address: '', payment_method: '', shipping_method: '' });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => { if (!data.session) router.replace('/login?next=/checkout'); else setF(x => ({ ...x, buyer_email: data.session.user.email })); });
     setCart(JSON.parse(localStorage.getItem('cart') || '[]'));
     supabase.from('payment_methods').select('*').eq('active', true).then(({ data }) => { setPay(data || []); if (data?.[0]) setF(x => ({ ...x, payment_method: data[0].name })); });
     supabase.from('shipping_methods').select('*').eq('active', true).then(({ data }) => { setShip(data || []); if (data?.[0]) setF(x => ({ ...x, shipping_method: data[0].name })); });
@@ -18,10 +19,12 @@ export default function Checkout() {
   const set = k => e => setF({ ...f, [k]: e.target.value });
   const submit = async e => {
     e.preventDefault(); setBusy(true);
-    const r = await fetch('/api/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, items: cart }) });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return router.push('/login?next=/checkout');
+    const r = await fetch('/api/order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ ...f, items: cart }) });
     const d = await r.json(); setBusy(false);
     if (!r.ok) return alert(d.error || 'Gagal membuat pesanan');
-    save([]); router.push(`/track?code=${d.code}&phone=${encodeURIComponent(f.buyer_phone)}`);
+    save([]); router.push(`/track?code=${d.code}`);
   };
   if (!cart.length) return <div className="wrap"><p className="empty-txt">Keranjang kosong. Pilih produk dulu di halaman utama.</p></div>;
   return <form className="wrap co" onSubmit={submit}>

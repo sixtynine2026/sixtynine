@@ -7,7 +7,9 @@ export default function Product() {
   const [p, setP] = useState(null); const [size, setSize] = useState(''); const [qty, setQty] = useState(1);
   useEffect(() => { supabase.from('products').select('*').eq('id', id).single().then(({ data }) => { setP(data); setSize((data?.sizes || '').split(',')[0]?.trim() || ''); }); }, [id]);
   if (!p) return <div className="wrap"><p className="empty-txt">Memuat produk...</p></div>;
-  const add = () => {
+  const add = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return router.push('/login?next=' + encodeURIComponent('/product/' + id));
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     const ex = cart.find(i => i.id === p.id && i.size === size);
     if (ex) ex.qty += qty; else cart.push({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, size, qty });
