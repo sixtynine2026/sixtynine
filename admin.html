@@ -1,0 +1,109 @@
+<!doctype html><html lang="id"><head><title>Admin - SIXTYNINE PROJECT</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="/js/config.js"></script><script src="/js/app.js"></script></head>
+<body><div id="app" class="adm">Memuat...</div>
+<script>
+const STATUS = ["Menunggu Pembayaran", "Dibayar", "Diproses", "Dikirim", "Selesai", "Dibatalkan"];
+const T = {
+  products: { label: "Produk", order: "created_at", def: { name: "Produk baru", category: "JACKET", price: 0, stock: 0 },
+    fields: [["image_url", "Foto", "image"], ["name", "Nama artikel"], ["category", "Kategori"], ["price", "Harga jual", "number"], ["strike_price", "Harga coret", "number"], ["stock", "Sisa stok", "number"], ["sizes", "Ukuran (pisah koma)"], ["active", "Tampil", "bool"]] },
+  banners: { label: "Banner", order: "sort", def: { sort: 0 }, fields: [["image_url", "Foto banner", "image"], ["sort", "Urutan", "number"], ["active", "Tampil", "bool"]] },
+  payment_methods: { label: "Pembayaran", order: "name", def: { name: "Metode baru" },
+    fields: [["name", "Metode"], ["account_name", "Atas nama"], ["account_number", "No. rekening"], ["qris_url", "Gambar QRIS", "image"], ["note", "Catatan"], ["active", "Aktif", "bool"]] },
+  shipping_methods: { label: "Jasa kirim", order: "name", def: { name: "Ekspedisi baru", cost: 0 }, fields: [["name", "Jasa kirim"], ["cost", "Ongkir (Rp)", "number"], ["active", "Aktif", "bool"]] }
+};
+const TABS = [["dash", "Ringkasan"], ["orders", "Pesanan"], ["products", "Produk & stok"], ["banners", "Banner"], ["payment_methods", "Pembayaran"], ["shipping_methods", "Jasa kirim"], ["users", "Pelanggan"]];
+let tab = "dash", ORD = [], EV = [], FLT = "";
+const app = $("#app");
+const tok = async () => (await me()).access_token;
+async function getUsers() { const r = await fetch("/api/users", { headers: { Authorization: "Bearer " + await tok() } }); const j = await r.json(); if (!r.ok) throw new Error(j.error); return j.users; }
+async function init() { const s = await me(); if (!s) return loginView(); if (!(await isAdmin())) return notAdmin(s.user.email); shell(); }
+function loginView() {
+  app.className = "adm login";
+  app.innerHTML = `<h1>SIXTYNINE ADMIN</h1><form id="lf"><label>Email<input name="email" type="email" required></label><label>Password<input name="password" type="password" required></label><button class="btn">Masuk</button></form>`;
+  $("#lf").onsubmit = async e => { e.preventDefault(); const d = new FormData(e.target); const { error } = await sb.auth.signInWithPassword({ email: d.get("email"), password: d.get("password") }); if (error) return alert(error.message); init(); };
+}
+async function logout() { await sb.auth.signOut(); location.reload(); }
+function notAdmin(email) {
+  app.className = "adm login";
+  app.innerHTML = `<h1>Bukan akun admin</h1><p>Kamu login sebagai <b>${esc(email)}</b>, dan email ini belum terdaftar di tabel admins.</p><button class="btn" onclick="logout()">Keluar dan ganti akun</button> <a class="btn ghost" href="/">Ke toko</a>`;
+}
+function shell() {
+  app.className = "adm";
+  app.innerHTML = `<div class="tabs"><b>SIXTYNINE ADMIN</b>${TABS.map(([k, l]) => `<button data-t="${k}">${l}</button>`).join("")}<button onclick="location.href='/'">Lihat toko</button><button onclick="logout()">Keluar</button></div><div id="body"></div>`;
+  app.querySelectorAll("[data-t]").forEach(b => b.onclick = () => show(b.dataset.t)); show(tab);
+}
+function show(t) { tab = t; app.querySelectorAll("[data-t]").forEach(b => b.classList.toggle("on", b.dataset.t === t)); ({ dash, orders, users }[t] || (() => crud(t)))(); }
+
+async function dash() {
+  const body = $("#body"); body.textContent = "Memuat...";
+  const o = (await sb.from("orders").select("total,status")).data || [], p = (await sb.from("products").select("name,stock")).data || [];
+  let u = "?"; try { u = (await getUsers()).length; } catch (e) {}
+  const paid = o.filter(x => ["Dibayar", "Diproses", "Dikirim", "Selesai"].includes(x.status)), low = p.filter(x => x.stock <= 3);
+  body.innerHTML = `<div class="cards"><div><small>Total pesanan</small><b>${o.length}</b></div><div><small>Menunggu pembayaran</small><b>${o.filter(x => x.status === "Menunggu Pembayaran").length}</b></div>
+  <div><small>Perlu diproses</small><b>${o.filter(x => x.status === "Dibayar").length}</b></div><div><small>Omzet (sudah dibayar)</small><b>${rp(paid.reduce((a, x) => a + x.total, 0))}</b></div>
+  <div><small>Pelanggan terdaftar</small><b>${u}</b></div><div><small>Jumlah produk</small><b>${p.length}</b></div></div>
+  <h3>Stok menipis (3 atau kurang)</h3>${low.length ? "<ul>" + low.map(x => `<li>${esc(x.name)}: sisa ${x.stock}</li>`).join("") + "</ul>" : "<p>Semua stok aman.</p>"}`;
+}
+
+function cell(x, k, ty, t) {
+  if (ty === "image") return (x[k] ? `<img class="thumb" src="${esc(x[k])}" alt="">` : "") + `<input type="file" accept="image/*" onchange="upImg('${t}','${x.id}','${k}',this)">`;
+  if (ty === "bool") return `<input type="checkbox" data-k="${k}" ${x[k] ? "checked" : ""}>`;
+  return `<input data-k="${k}" type="${ty || "text"}" value="${esc(x[k] ?? "")}" ${k === "stock" && x[k] <= 3 ? "class=\"low\"" : ""}>`;
+}
+async function crud(t) {
+  const c = T[t]; $("#body").textContent = "Memuat...";
+  const { data, error } = await sb.from(t).select("*").order(c.order); if (error) alert("Gagal memuat: " + error.message);
+  const rows = data || [];
+  $("#body").innerHTML = `<button class="btn" onclick="addRow('${t}')">+ Tambah ${c.label}</button><div class="scroll"><table><thead><tr>${c.fields.map(f => `<th>${f[1]}</th>`).join("")}<th></th></tr></thead><tbody>
+  ${rows.map(x => `<tr data-id="${x.id}">${c.fields.map(([k, , ty]) => `<td>${cell(x, k, ty, t)}</td>`).join("")}<td><button class="btn" onclick="saveRow('${t}','${x.id}')">Simpan</button> <button class="btn ghost" onclick="delRow('${t}','${x.id}')">Hapus</button></td></tr>`).join("")}</tbody></table></div>${rows.length ? "" : "<p>Belum ada data. Klik tombol Tambah.</p>"}`;
+}
+async function addRow(t) { const { error } = await sb.from(t).insert(T[t].def); if (error) return alert("Gagal menambah: " + error.message); crud(t); }
+async function delRow(t, id) { if (!confirm("Hapus data ini?")) return; const { error } = await sb.from(t).delete().eq("id", id); if (error) alert(error.message); crud(t); }
+async function saveRow(t, id) {
+  const o = {};
+  document.querySelectorAll(`tr[data-id="${id}"] [data-k]`).forEach(i => { o[i.dataset.k] = i.type === "checkbox" ? i.checked : i.type === "number" ? (i.value === "" ? null : +i.value) : i.value; });
+  const { error } = await sb.from(t).update(o).eq("id", id); alert(error ? "Gagal: " + error.message : "Tersimpan");
+}
+async function upImg(t, id, k, el) {
+  const file = el.files[0]; if (!file) return;
+  const path = Date.now() + "-" + file.name.replace(/[^\w.]/g, "_");
+  const up = await sb.storage.from("images").upload(path, file); if (up.error) return alert("Upload gagal: " + up.error.message);
+  const url = sb.storage.from("images").getPublicUrl(path).data.publicUrl;
+  const { error } = await sb.from(t).update({ [k]: url }).eq("id", id); if (error) return alert(error.message); crud(t);
+}
+
+async function orders() {
+  const a = await sb.from("orders").select("*").order("created_at", { ascending: false }), b = await sb.from("tracking_events").select("*").order("created_at", { ascending: false });
+  if (a.error) alert(a.error.message); ORD = a.data || []; EV = b.data || []; drawOrders();
+}
+function drawOrders() {
+  $("#body").innerHTML = `<label>Filter status<select onchange="FLT=this.value;drawOrders()"><option value="">Semua</option>${STATUS.map(s => `<option ${s === FLT ? "selected" : ""}>${s}</option>`).join("")}</select></label>
+  <div class="list">${ORD.filter(o => !FLT || o.status === FLT).map(o => `<div class="box"><h3>${o.code} · ${rp(o.total)} · ${o.status}</h3>
+   <p>${esc(o.buyer_name)} · ${esc(o.buyer_phone)}<br>${esc(o.address)}</p><p>${o.items.map(i => esc(i.name) + " (" + esc(i.size) + ") x" + i.qty).join(", ")}</p><p>${esc(o.shipping_method)} · bayar via ${esc(o.payment_method)}</p>
+   <label>Status<select onchange="patch('${o.id}',{status:this.value})">${STATUS.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></label>
+   <label>Ekspedisi<input value="${esc(o.courier || "")}" onblur="patch('${o.id}',{courier:this.value},1)"></label>
+   <label>No. resi<input value="${esc(o.resi || "")}" onblur="patch('${o.id}',{resi:this.value},1)"></label>
+   <div class="row"><button class="btn" onclick="proses('${o.id}')">Proses dan cetak label</button><a class="btn ghost" target="_blank" href="/print?id=${o.id}">Cetak ulang</a></div>
+   <label>Update tracking (tempel dari web resmi ekspedisi)<textarea id="n-${o.id}" rows="3"></textarea></label><button class="btn" onclick="addEv('${o.id}')">Tambah update</button>
+   ${EV.filter(e => e.order_id === o.id).map(e => `<p class="evt"><small>${new Date(e.created_at).toLocaleString("id-ID")}</small> ${esc(e.note)} <a onclick="delEv('${e.id}')">hapus</a></p>`).join("")}</div>`).join("") || "<p>Belum ada pesanan.</p>"}</div>`;
+}
+async function patch(id, p, quiet) {
+  const o = ORD.find(x => x.id === id);
+  if (Object.keys(p).every(k => (o[k] ?? "") === p[k])) return;
+  if (p.status === "Dibatalkan" && o.status !== "Dibatalkan") for (const i of o.items) {
+    const { data: pr } = await sb.from("products").select("stock").eq("id", i.id).maybeSingle();
+    if (pr) await sb.from("products").update({ stock: pr.stock + i.qty }).eq("id", i.id);
+  }
+  const { error } = await sb.from("orders").update(p).eq("id", id); if (error) return alert(error.message);
+  Object.assign(o, p); if (!quiet) drawOrders();
+}
+async function proses(id) { const w = window.open("about:blank", "_blank"); await patch(id, { status: "Diproses" }); if (w) w.location = "/print?id=" + id; }
+async function addEv(id) { const t = $("#n-" + id).value.trim(); if (!t) return; const { error } = await sb.from("tracking_events").insert({ order_id: id, note: t }); if (error) return alert(error.message); orders(); }
+async function delEv(id) { await sb.from("tracking_events").delete().eq("id", id); orders(); }
+
+async function users() {
+  $("#body").textContent = "Memuat..."; let u = []; try { u = await getUsers(); } catch (e) { alert(e.message); }
+  const o = (await sb.from("orders").select("user_id")).data || [];
+  $("#body").innerHTML = `<p><b>${u.length}</b> pelanggan terdaftar</p><div class="scroll"><table><thead><tr><th>Email</th><th>Daftar</th><th>Email terkonfirmasi</th><th>Jumlah pesanan</th></tr></thead><tbody>${u.map(x => `<tr><td>${esc(x.email)}</td><td>${new Date(x.created_at).toLocaleDateString("id-ID")}</td><td>${x.confirmed ? "Ya" : "Belum"}</td><td>${o.filter(y => y.user_id === x.id).length}</td></tr>`).join("")}</tbody></table></div>`;
+}
+init();
+</script></body></html>

@@ -1,0 +1,25 @@
+<!doctype html><html lang="id"><head><title>Produk - SIXTYNINE PROJECT</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="/js/config.js"></script><script src="/js/app.js"></script></head>
+<body><div id="hd"></div><main><div id="box" class="wrap pd"></div></main><div id="ft"></div>
+<script>
+(async () => {
+  await layout();
+  const id = new URLSearchParams(location.search).get("id");
+  const { data: p } = await sb.from("products").select("*").eq("id", id).maybeSingle();
+  if (!p) return $("#box").innerHTML = "<p class=\"empty-txt\">Produk tidak ditemukan.</p>";
+  const sizes = (p.sizes || "").split(",").map(s => s.trim()).filter(Boolean); let size = sizes[0] || "", qty = 1;
+  $("#box").innerHTML = `<img src="${esc(p.image_url)}" alt=""><div><small>${esc(p.category)}</small><h1>${esc(p.name)}</h1>
+   <b class="price">${p.strike_price > p.price ? "<s>" + rp(p.strike_price) + "</s> " : ""}${rp(p.price)} ${disc(p) ? "<i class=\"badge inl\">-" + disc(p) + "%</i>" : ""}</b>
+   <p>Sisa stok: ${p.stock}</p><div class="sizes" id="sz">${sizes.map(s => `<button class="${s === size ? "on" : ""}">${esc(s)}</button>`).join("")}</div>
+   <div class="qty"><button id="mn">-</button><span id="q">1</span><button id="pl">+</button></div>
+   <button class="btn" id="add" ${p.stock <= 0 ? "disabled" : ""}>${p.stock <= 0 ? "Stok habis" : "Tambah ke keranjang"}</button></div>`;
+  $("#sz").onclick = e => { if (e.target.tagName !== "BUTTON") return; size = e.target.textContent; document.querySelectorAll("#sz button").forEach(b => b.classList.toggle("on", b === e.target)); };
+  $("#mn").onclick = () => { qty = Math.max(1, qty - 1); $("#q").textContent = qty; };
+  $("#pl").onclick = () => { qty++; $("#q").textContent = qty; };
+  $("#add").onclick = async () => {
+    if (!(await me())) return location.href = "/login?next=" + encodeURIComponent("/produk?id=" + id);
+    const c = cart.get(), ex = c.find(i => i.id === p.id && i.size === size);
+    if (ex) ex.qty += qty; else c.push({ id: p.id, name: p.name, price: p.price, image_url: p.image_url, size, qty });
+    cart.set(c); location.href = "/checkout";
+  };
+})();
+</script></body></html>

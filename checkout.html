@@ -1,0 +1,35 @@
+<!doctype html><html lang="id"><head><title>Checkout - SIXTYNINE PROJECT</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="/js/config.js"></script><script src="/js/app.js"></script></head>
+<body><div id="hd"></div><main><div class="wrap" id="empty" hidden><p class="empty-txt">Keranjang kosong. Pilih produk dulu di halaman utama.</p></div>
+<form class="wrap co" id="f" hidden><div><h2 class="ttl"><span>DATA PENERIMA</span></h2>
+<label>Nama penerima<input id="nm" required></label><label>No. HP penerima<input id="hp" inputmode="tel" required></label>
+<label>Email (untuk konfirmasi)<input id="em" type="email"></label><label>Alamat lengkap<textarea id="ad" rows="4" required></textarea></label>
+<label>Jasa kirim<select id="sh"></select></label><label>Metode pembayaran<select id="py"></select></label></div>
+<div><h2 class="ttl"><span>PESANAN</span></h2><div id="lines"></div><p class="sum">Subtotal <b id="st"></b></p><p class="sum">Ongkir <b id="ok"></b></p><p class="sum tot">Total <b id="tt"></b></p>
+<button class="btn" id="go">Buat pesanan</button></div></form></main><div id="ft"></div>
+<script>
+let ship = [];
+(async () => {
+  await layout(); const s = await requireLogin(); em.value = s.user.email;
+  const [p, h] = await Promise.all([sb.from("payment_methods").select("*").eq("active", true), sb.from("shipping_methods").select("*").eq("active", true)]);
+  ship = h.data || [];
+  py.innerHTML = (p.data || []).map(x => "<option>" + esc(x.name) + "</option>").join("");
+  sh.innerHTML = ship.map(x => "<option value=\"" + esc(x.name) + "\">" + esc(x.name) + " - " + rp(x.cost) + "</option>").join("");
+  sh.onchange = draw; draw();
+})();
+function draw() {
+  const c = cart.get(); empty.hidden = c.length > 0; f.hidden = !c.length;
+  lines.innerHTML = c.map((i, k) => "<div class=\"line\"><img src=\"" + esc(i.image_url) + "\" alt=\"\"><div><p>" + esc(i.name) + "</p><small>Ukuran " + esc(i.size) + " × " + i.qty + "</small><b>" + rp(i.price * i.qty) + "</b></div><button type=\"button\" class=\"x\" onclick=\"del(" + k + ")\">×</button></div>").join("");
+  const sub = c.reduce((a, i) => a + i.price * i.qty, 0), cost = (ship.find(x => x.name === sh.value) || {}).cost || 0;
+  st.textContent = rp(sub); ok.textContent = rp(cost); tt.textContent = rp(sub + cost);
+}
+function del(k) { const c = cart.get(); c.splice(k, 1); cart.set(c); draw(); }
+f.onsubmit = async e => {
+  e.preventDefault(); go.disabled = true;
+  const s = await requireLogin();
+  const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + s.access_token },
+    body: JSON.stringify({ buyer_name: nm.value, buyer_phone: hp.value, buyer_email: em.value, address: ad.value, payment_method: py.value, shipping_method: sh.value, items: cart.get() }) });
+  const d = await r.json().catch(() => ({})); go.disabled = false;
+  if (!r.ok) return alert(d.error || "Gagal membuat pesanan");
+  cart.set([]); location.href = "/pesanan?code=" + d.code;
+};
+</script></body></html>

@@ -1,20 +1,9 @@
-# SIXTYNINE PROJECT
+# SIXTYNINE PROJECT (HTML + Supabase + Vercel)
 
-Toko online streetwear (Next.js + Supabase + Resend). Ada sisi pembeli dan sisi admin di `/admin`.
+Halaman: `/` toko, `/produk?id=`, `/login`, `/checkout`, `/pesanan`, `/admin`, `/print?id=`. Folder `api/` adalah fungsi server Vercel (buat pesanan + kirim email, daftar pelanggan).
 
-## Setup
-1. **Supabase**: buat project, buka SQL Editor, jalankan `supabase/schema.sql`.
-1b. Jalankan juga `supabase/migration-user-login.sql` (menyimpan riwayat pesanan per akun pembeli).
-2. Authentication > Users > Add user (email + password admin). Lalu jalankan: `insert into admins values ('emailadmin@kamu.com');`
-3. Salin `.env.example` ke `.env.local`, isi dari Supabase (Project Settings > API). `SUPABASE_SERVICE_ROLE_KEY` rahasia, jangan di-commit.
-4. **Resend**: buat API key, verifikasi domain, isi `RESEND_API_KEY` dan `RESEND_FROM`. Tanpa ini pesanan tetap masuk, hanya email tidak terkirim.
-5. Lokal: `npm install && npm run dev`.
-6. **Deploy**: push ke GitHub, import di Vercel, masukkan semua env di Project Settings > Environment Variables.
-
-## Akun pembeli
-Pembeli wajib daftar/masuk di `/login` untuk menambah keranjang dan checkout. Riwayat dan tracking ada di **Pesanan Saya** (`/track`), hanya terlihat oleh pemilik akunnya. Supabase > Authentication > Providers > Email: matikan *Confirm email* kalau mau pembeli bisa langsung masuk tanpa verifikasi email.
-
-## Alur admin
-- `/admin` > Banner / Produk (harga jual + harga coret) / Pembayaran / Jasa kirim: tambah, ubah, hapus, upload foto.
-- Pesanan masuk: klik **Proses & cetak label** (status jadi Diproses, label pengirim sixtynineproject / 085171040017 / Arcamanik, Kota Bandung terbuka siap print).
-- Isi ekspedisi + no. resi, lalu tempel teks tracking dari web resmi ekspedisi ke **Update tracking**. Pembeli melihatnya di `/track` (kode pesanan + no. HP).
+1. Buka `js/config.js`, isi SUPABASE_URL dan SUPABASE_ANON_KEY.
+2. Supabase SQL Editor: jalankan `supabase/schema.sql`, `migration-user-login.sql`, `perbaikan-admin.sql` (yang sudah pernah dijalankan boleh dilewati).
+3. Vercel: import repo GitHub, **Framework Preset: Other**, kosongkan Build Command. Isi Environment Variables: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM`, `ADMIN_NOTIFY_EMAIL`.
+4. Admin: buka `/admin` atau login di `/login` dengan email yang ada di tabel `admins`.
+Tes lokal: `npx vercel dev`.

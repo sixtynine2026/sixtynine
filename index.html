@@ -1,0 +1,14 @@
+<!doctype html><html lang="id"><head><title>SIXTYNINE PROJECT</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="/js/config.js"></script><script src="/js/app.js"></script></head>
+<body><div id="hd"></div><main><div id="hero" class="hero"></div><div id="shop" class="wrap"></div></main><div id="ft"></div>
+<script>
+(async () => {
+  await layout();
+  const [b, p] = await Promise.all([
+    sb.from("banners").select("*").eq("active", true).order("sort"),
+    sb.from("products").select("*").eq("active", true).order("created_at", { ascending: false })]);
+  slider(b.data || []);
+  const prods = p.data || [], cats = [...new Set(prods.map(x => x.category))];
+  $("#shop").innerHTML = cats.map((c, i) => `<section id="c${i}"><h2 class="ttl"><span>NEW PRODUCT ${esc(c)}</span></h2><div class="grid">${prods.filter(x => x.category === c).map(card).join("")}</div></section>`).join("")
+    + (cats.length ? `<h2 class="ttl"><span>PILIH KATEGORI</span></h2><div class="tiles">${cats.map((c, i) => `<a href="#c${i}" class="tile"><img src="${esc(prods.find(x => x.category === c).image_url)}" alt=""><span>${esc(c)}</span></a>`).join("")}</div>` : "<p class=\"empty-txt\">Belum ada produk. Tambahkan lewat /admin.</p>");
+})();
+</script></body></html>
