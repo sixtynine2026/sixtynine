@@ -83,7 +83,7 @@ export default function Admin() {
   return <div className="adm">
     <div className="tabs"><b>SIXTYNINE ADMIN</b>
       {[['orders', 'Pesanan'], ...Object.entries(TABLES).map(([k, v]) => [k, v.label])].map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
-      <button onClick={async () => { await supabase.auth.signOut(); setOk(false); }}>Keluar</button></div>
+      <button onClick={() => { location.href = '/'; }}>Lihat toko</button><button onClick={async () => { await supabase.auth.signOut(); setOk(false); }}>Keluar</button></div>
     {tab === 'orders' ? <Orders /> : <Crud key={tab} t={tab} />}
   </div>;
 }

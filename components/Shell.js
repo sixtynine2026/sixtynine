@@ -7,14 +7,16 @@ export default function Shell({ children }) {
   const p = usePathname();
   const [n, setN] = useState(0);
   const [u, setU] = useState(null);
+  const [adm, setAdm] = useState(false);
   useEffect(() => {
     const f = () => { try { setN(JSON.parse(localStorage.getItem('cart') || '[]').reduce((a, i) => a + i.qty, 0)); } catch {} };
     f(); window.addEventListener('cart', f);
     return () => window.removeEventListener('cart', f);
   }, []);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setU(data.session?.user || null));
-    const { data: l } = supabase.auth.onAuthStateChange((_e, s) => setU(s?.user || null));
+    const chk = async x => { setU(x); if (!x) return setAdm(false); const { data } = await supabase.rpc('is_admin'); setAdm(!!data); };
+    supabase.auth.getSession().then(({ data }) => chk(data.session?.user || null));
+    const { data: l } = supabase.auth.onAuthStateChange((_e, s) => setTimeout(() => chk(s?.user || null), 0));
     return () => l.subscription.unsubscribe();
   }, []);
   const out = async e => { e.preventDefault(); await supabase.auth.signOut(); localStorage.setItem('cart', '[]'); window.dispatchEvent(new Event('cart')); location.href = '/'; };
@@ -23,7 +25,7 @@ export default function Shell({ children }) {
     <div className="bar">LEBIH HEMAT BELANJA DI WEBSITE RESMI SIXTYNINE PROJECT</div>
     <header className="hd">
       <Link href="/" className="logo">SIXTY<br />NINE</Link>
-      <nav><Link href="/#shop">SHOP</Link><Link href="/track">PESANAN SAYA</Link><Link href="/checkout">KERANJANG ({n})</Link>{u ? <a href="#" onClick={out}>KELUAR</a> : <Link href="/login">MASUK</Link>}</nav>
+      <nav><Link href="/#shop">SHOP</Link><Link href="/track">PESANAN SAYA</Link><Link href="/checkout">KERANJANG ({n})</Link>{adm && <Link href="/admin">ADMIN</Link>}{u ? <a href="#" onClick={out}>KELUAR</a> : <Link href="/login">MASUK</Link>}</nav>
     </header>
     <main>{children}</main>
     <footer className="ft">

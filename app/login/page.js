@@ -13,7 +13,7 @@ export default function Login() {
     const { data, error } = reg ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) return alert(error.message === 'Invalid login credentials' ? 'Email atau password salah' : error.message);
-    if (data.session) go(); else alert('Akun dibuat. Cek email kamu untuk konfirmasi, lalu masuk.');
+    if (data.session) { const { data: a } = await supabase.rpc('is_admin'); if (a) { location.href = '/admin'; return; } go(); } else alert('Akun dibuat. Cek email kamu untuk konfirmasi, lalu masuk.');
   };
   return <div className="wrap tr">
     <h2 className="ttl"><span>{reg ? 'DAFTAR' : 'MASUK'}</span></h2>
