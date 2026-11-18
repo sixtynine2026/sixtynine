@@ -14,3 +14,12 @@
 .evt{border-left:3px solid #e10600;padding-left:8px;margin:8px 0}.evt a{color:#e10600;cursor:pointer;margin-left:8px}
 .adm .btn{display:inline-block;background:#111;color:#fff;border:0;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;margin-top:8px}
 .adm .btn.ghost{background:#fff;color:#111;border:1px solid #111}
+.adm{max-width:1240px}
+.scroll{overflow-x:auto;margin-top:14px}
+.adm table{border-collapse:collapse;width:100%;background:#fff;min-width:760px}
+.adm th,.adm td{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:12px;text-align:left}
+.adm td input:not([type=checkbox]){min-width:90px;margin:0}
+.adm td .btn{padding:7px 10px;margin:0 0 4px}
+.adm .low{border-color:#e10600;background:#fff1f0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.cards div{border:1px solid #111;padding:14px;background:#fff}.cards small{display:block}.cards b{font:22px 'Archivo Black',sans-serif}

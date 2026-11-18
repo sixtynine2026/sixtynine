@@ -24,6 +24,7 @@ export default function Orders() {
       return <details className="res" key={o.id} open={o.code === open}>
         <summary><b>{o.code}</b> · {o.status} · {rp(o.total)}<br /><small>{new Date(o.created_at).toLocaleDateString('id-ID')}</small></summary>
         {o.status === 'Menunggu Pembayaran' && p && <p className="note">Transfer {rp(o.total)} ke {p.name} {p.account_number} a.n. {p.account_name}. {p.note}</p>}
+        {o.status === 'Menunggu Pembayaran' && p?.qris_url && <img src={p.qris_url} alt="QRIS" style={{ maxWidth: 260, margin: '10px 0' }} />}
         <p>{o.shipping_method}{o.resi ? ` · Resi ${o.resi}` : ''}</p>
         {o.items.map((i, k) => <p key={k}>{i.name} ({i.size}) × {i.qty}</p>)}
         <h3>Perjalanan paket</h3>

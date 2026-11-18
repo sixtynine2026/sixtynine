@@ -10,11 +10,14 @@ export async function POST(req) {
   const { data: ps } = await db.from('products').select('*').in('id', b.items.map(i => i.id)).eq('active', true);
   const items = b.items.map(i => { const p = ps?.find(x => x.id === i.id); return p && { id: p.id, name: p.name, size: i.size, qty: Math.max(1, +i.qty || 1), price: p.price }; }).filter(Boolean);
   if (!items.length) return NextResponse.json({ error: 'Produk tidak tersedia' }, { status: 400 });
+  const need = {}; items.forEach(i => { need[i.id] = (need[i.id] || 0) + i.qty; });
+  for (const p of ps) if ((need[p.id] || 0) > p.stock) return NextResponse.json({ error: `Stok ${p.name} tinggal ${p.stock}` }, { status: 400 });
   const { data: sh } = await db.from('shipping_methods').select('*').eq('name', b.shipping_method).maybeSingle();
   const subtotal = items.reduce((a, i) => a + i.price * i.qty, 0); const shipping = sh?.cost || 0;
   const code = 'SP' + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 90 + 10);
   const { error } = await db.from('orders').insert({ code, buyer_name: b.buyer_name, buyer_phone: b.buyer_phone, user_id: user.id, buyer_email: b.buyer_email || user.email, address: b.address, items, subtotal, shipping_cost: shipping, total: subtotal + shipping, payment_method: b.payment_method, shipping_method: b.shipping_method, courier: b.shipping_method });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  for (const p of ps) if (need[p.id]) await db.from('products').update({ stock: p.stock - need[p.id] }).eq('id', p.id);
   try {
     if (process.env.RESEND_API_KEY) {
       const to = [b.buyer_email || user.email, process.env.ADMIN_NOTIFY_EMAIL].filter(Boolean);
